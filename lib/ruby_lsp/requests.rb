@@ -41,6 +41,9 @@ module RubyLsp
     autoload :CodeLens, "ruby_lsp/requests/code_lens"
     autoload :Definition, "ruby_lsp/requests/definition"
     autoload :ShowSyntaxTree, "ruby_lsp/requests/show_syntax_tree"
+    autoload :PrepareTypeHierarchy, "ruby_lsp/requests/prepare_type_hierarchy"
+    autoload :TypeHierarchySubtypes, "ruby_lsp/requests/type_hierarchy_subtypes"
+    autoload :TypeHierarchySupertypes, "ruby_lsp/requests/type_hierarchy_supertypes"
 
     # :nodoc:
     module Support

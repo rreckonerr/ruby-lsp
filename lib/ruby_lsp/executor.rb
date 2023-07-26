@@ -169,6 +169,18 @@ module RubyLsp
         completion(uri, request.dig(:params, :position))
       when "textDocument/definition"
         definition(uri, request.dig(:params, :position))
+      when "textDocument/prepareTypeHierarchy"
+        prepare_type_hierarchy(uri, request.dig(:params, :position))
+      when "typeHierarchy/supertypes"
+        item = type_hierarchy_item(request)
+        return unless item
+
+        type_hierarchy_supertypes(item)
+      when "typeHierarchy/subtypes"
+        item = type_hierarchy_item(request)
+        return unless item
+
+        type_hierarchy_subtypes(item)
       when "rubyLsp/textDocument/showSyntaxTree"
         { ast: Requests::ShowSyntaxTree.new(@store.get(uri)).run }
       end
@@ -428,6 +440,80 @@ module RubyLsp
       listener.response
     end
 
+    sig do
+      params(
+        uri: String,
+        position: Document::PositionShape,
+      ).returns(T.nilable(T::Array[Interface::TypeHierarchyItem]))
+    end
+    def prepare_type_hierarchy(uri, position)
+      document = @store.get(uri)
+      return if document.syntax_error?
+
+      target, _parent = document.locate_node(position, node_types: [
+        SyntaxTree::ClassDeclaration,
+        SyntaxTree::ModuleDeclaration,
+        # SyntaxTree::Const,
+      ])
+      return unless target
+
+      # Instantiate all listeners
+      emitter = EventEmitter.new
+      request = Requests::PrepareTypeHierarchy.new(emitter, @message_queue, document, target)
+      emitter.visit(document.tree)
+
+      request.merge_external_listeners_responses!
+      request.response
+    end
+
+    sig { params(item: Interface::TypeHierarchyItem).returns(T.nilable(T::Array[Interface::TypeHierarchyItem])) }
+    def type_hierarchy_supertypes(item)
+      emitter = EventEmitter.new
+      request = Requests::TypeHierarchySupertypes.new(emitter, @message_queue, item)
+      request.merge_external_listeners_responses!
+      request.response
+    end
+
+    sig { params(item: Interface::TypeHierarchyItem).returns(T.nilable(T::Array[Interface::TypeHierarchyItem])) }
+    def type_hierarchy_subtypes(item)
+      emitter = EventEmitter.new
+      request = Requests::TypeHierarchySubtypes.new(emitter, @message_queue, item)
+      request.merge_external_listeners_responses!
+      request.response
+    end
+
+    sig { params(request: T::Hash[Symbol, T.untyped]).returns(T.nilable(Interface::TypeHierarchyItem)) }
+    def type_hierarchy_item(request)
+      param = request.dig(:params, :item)
+      return unless param
+
+      Interface::TypeHierarchyItem.new(
+        name: param.dig(:name),
+        kind: param.dig(:kind),
+        uri: param.dig(:uri),
+        range: Interface::Range.new(
+          start: Interface::Position.new(
+            line: param.dig(:range, :start, :line),
+            character: param.dig(:range, :start, :character),
+          ),
+          end: Interface::Position.new(
+            line: param.dig(:range, :end, :line),
+            character: param.dig(:range, :end, :character),
+          ),
+        ),
+        selection_range: Interface::Range.new(
+          start: Interface::Position.new(
+            line: param.dig(:selectionRange, :start, :line),
+            character: param.dig(:selectionRange, :start, :character),
+          ),
+          end: Interface::Position.new(
+            line: param.dig(:selectionRange, :end, :line),
+            character: param.dig(:selectionRange, :end, :character),
+          ),
+        ),
+      )
+    end
+
     sig { params(options: T::Hash[Symbol, T.untyped]).returns(Interface::InitializeResult) }
     def initialize_request(options)
       @store.clear
@@ -533,6 +619,10 @@ module RubyLsp
         )
       end
 
+      type_hierarchy_provider = if enabled_features["typeHierarchy"]
+        Interface::TypeHierarchyOptions.new
+      end
+
       Interface::InitializeResult.new(
         capabilities: Interface::ServerCapabilities.new(
           text_document_sync: Interface::TextDocumentSyncOptions.new(
@@ -547,6 +637,7 @@ module RubyLsp
           folding_range_provider: folding_ranges_provider,
           semantic_tokens_provider: semantic_tokens_provider,
           document_formatting_provider: enabled_features["formatting"] && formatter != "none",
+          type_hierarchy_provider: type_hierarchy_provider,
           document_highlight_provider: enabled_features["documentHighlights"],
           code_action_provider: code_action_provider,
           document_on_type_formatting_provider: on_type_formatting_provider,

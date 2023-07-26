@@ -38,6 +38,10 @@ module RubyLsp
     sig { params(node: T.nilable(SyntaxTree::Node)).void }
     def emit_for_target(node)
       case node
+      # when SyntaxTree::ClassDeclaration
+        # @listeners[:on_class]&.each { |l| T.unsafe(l).on_class(node) }
+      # when SyntaxTree::ModuleDeclaration
+        # @listeners[:on_module]&.each { |l| T.unsafe(l).on_module(node) }
       when SyntaxTree::Command
         @listeners[:on_command]&.each { |l| T.unsafe(l).on_command(node) }
       when SyntaxTree::CallNode
