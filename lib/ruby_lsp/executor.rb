@@ -28,7 +28,6 @@ module RubyLsp
         error = e
       end
 
-      $stderr.puts("execute response: #{response}")
       Result.new(response: response, error: error, request_time: request_time)
     end
 
@@ -170,35 +169,16 @@ module RubyLsp
         completion(uri, request.dig(:params, :position))
       when "textDocument/definition"
         definition(uri, request.dig(:params, :position))
+      when "textDocument/prepareTypeHierarchy"
+        prepare_type_hierarchy(uri, request.dig(:params, :position))
+      when "typeHierarchy/supertypes"
+        uri = request.dig(:params, :item, :uri)
+        type_hierarchy_supertypes(uri, request.dig(:params, :item, :selectionRange, :start))
+      when "typeHierarchy/subtypes"
+        uri = request.dig(:params, :item, :uri)
+        type_hierarchy_subtypes(uri, request.dig(:params, :item, :selectionRange, :start))
       when "rubyLsp/textDocument/showSyntaxTree"
         show_syntax_tree(uri, request.dig(:params, :range))
-      when "textDocument/prepareTypeHierarchy"
-        $stderr.puts("I'm at prepareTypeHierarchy!")
-
-        # code_range = Interface::Range.new(
-        #   start: Interface::Position.new(line: 1, character: 1),
-        #   end: Interface::Position.new(line: 9, character: 4),
-        # )
-
-        # class_name_range = Interface::Range.new(
-        #   start: Interface::Position.new(line: 3, character: 7),
-        #   end: Interface::Position.new(line: 3, character: 25),
-        # )
-
-        ## returning below causes "missing PROVIDER" issues
-
-        # [
-        #   Interface::TypeHierarchyItem.new(
-        #     name: "ApplicationService",
-        #     kind: Constant::SymbolKind::CLASS,
-        #     uri: "file:///Users/joey/src/github.com/Shopify/kepler/app/services/application_service.rb",
-        #     range: code_range,
-        #     selection_range: Interface::SelectionRange.new(range: class_name_range),
-        #   ),
-        # ]
-
-        # returning nil works as expected, shows "No results."
-        nil
       end
     end
 
@@ -459,6 +439,142 @@ module RubyLsp
       listener = Requests::PathCompletion.new(emitter, @message_queue)
       emitter.emit_for_target(target)
       listener.response
+    end
+
+    sig do
+      params(uri: String, position: Document::PositionShape).returns(T.nilable(T::Array[Interface::TypeHierarchyItem]))
+    end
+    def prepare_type_hierarchy(uri, position)
+      document = @store.get(uri)
+      return if document.syntax_error?
+
+      target, _parent = document.locate_node(position, node_types: [
+        SyntaxTree::ClassDeclaration,
+        SyntaxTree::ModuleDeclaration,
+        # SyntaxTree::Const,
+      ])
+
+      return unless target
+
+      # Instantiate all listeners
+      emitter = EventEmitter.new
+      request = Requests::PrepareTypeHierarchy.new(emitter, @message_queue, document, target)
+      emitter.visit(document.tree)
+
+      request.merge_external_listeners_responses!
+      request.response
+    end
+
+    sig do
+      params(
+        uri: String,
+        position: Document::PositionShape,
+      ).returns(T.nilable(T::Array[Interface::TypeHierarchyItem]))
+    end
+    def type_hierarchy_supertypes(uri, position)
+      document = @store.get(uri)
+      return if document.syntax_error?
+
+      target, _parent = document.locate_node(position, node_types: [])
+      value = T.cast(target, SyntaxTree::Const).value
+
+      [
+        Interface::TypeHierarchyItem.new(
+          name: "#{value}::SubFoo",
+          kind: Constant::SymbolKind::CLASS,
+          uri: "file://foo.rb",
+          range: Interface::Range.new(
+            start: Interface::Position.new(line: 0, character: 0),
+            end: Interface::Position.new(line: 0, character: 0),
+          ),
+          selection_range: Interface::Range.new(
+            start: Interface::Position.new(line: 0, character: 0),
+            end: Interface::Position.new(line: 0, character: 0),
+          ),
+        ),
+        Interface::TypeHierarchyItem.new(
+          name: "#{value}::SubBar",
+          kind: Constant::SymbolKind::CLASS,
+          uri: "file://bar.rb",
+          range: Interface::Range.new(
+            start: Interface::Position.new(line: 1, character: 0),
+            end: Interface::Position.new(line: 1, character: 0),
+          ),
+          selection_range: Interface::Range.new(
+            start: Interface::Position.new(line: 1, character: 0),
+            end: Interface::Position.new(line: 1, character: 0),
+          ),
+        ),
+        Interface::TypeHierarchyItem.new(
+          name: "#{value}::SubBaz",
+          kind: Constant::SymbolKind::CLASS,
+          uri: "file:://baz.rb",
+          range: Interface::Range.new(
+            start: Interface::Position.new(line: 2, character: 0),
+            end: Interface::Position.new(line: 2, character: 0),
+          ),
+          selection_range: Interface::Range.new(
+            start: Interface::Position.new(line: 2, character: 0),
+            end: Interface::Position.new(line: 2, character: 0),
+          ),
+        ),
+      ]
+    end
+
+    sig do
+      params(
+        uri: String,
+        position: Document::PositionShape,
+      ).returns(T.nilable(T::Array[Interface::TypeHierarchyItem]))
+    end
+    def type_hierarchy_subtypes(uri, position)
+      document = @store.get(uri)
+      return if document.syntax_error?
+
+      target, _parent = document.locate_node(position, node_types: [])
+      value = T.cast(target, SyntaxTree::Const).value
+
+      [
+        Interface::TypeHierarchyItem.new(
+          name: "#{value}::SubFoo",
+          kind: Constant::SymbolKind::CLASS,
+          uri: "file://foo.rb",
+          range: Interface::Range.new(
+            start: Interface::Position.new(line: 0, character: 0),
+            end: Interface::Position.new(line: 0, character: 0),
+          ),
+          selection_range: Interface::Range.new(
+            start: Interface::Position.new(line: 0, character: 0),
+            end: Interface::Position.new(line: 0, character: 0),
+          ),
+        ),
+        Interface::TypeHierarchyItem.new(
+          name: "#{value}::SubBar",
+          kind: Constant::SymbolKind::CLASS,
+          uri: "file://bar.rb",
+          range: Interface::Range.new(
+            start: Interface::Position.new(line: 1, character: 0),
+            end: Interface::Position.new(line: 1, character: 0),
+          ),
+          selection_range: Interface::Range.new(
+            start: Interface::Position.new(line: 1, character: 0),
+            end: Interface::Position.new(line: 1, character: 0),
+          ),
+        ),
+        Interface::TypeHierarchyItem.new(
+          name: "#{value}::SubBaz",
+          kind: Constant::SymbolKind::CLASS,
+          uri: "file:://baz.rb",
+          range: Interface::Range.new(
+            start: Interface::Position.new(line: 2, character: 0),
+            end: Interface::Position.new(line: 2, character: 0),
+          ),
+          selection_range: Interface::Range.new(
+            start: Interface::Position.new(line: 2, character: 0),
+            end: Interface::Position.new(line: 2, character: 0),
+          ),
+        ),
+      ]
     end
 
     sig { params(options: T::Hash[Symbol, T.untyped]).returns(Interface::InitializeResult) }
