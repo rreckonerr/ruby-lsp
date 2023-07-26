@@ -28,6 +28,7 @@ module RubyLsp
         error = e
       end
 
+      $stderr.puts("execute response: #{response}")
       Result.new(response: response, error: error, request_time: request_time)
     end
 
@@ -171,6 +172,33 @@ module RubyLsp
         definition(uri, request.dig(:params, :position))
       when "rubyLsp/textDocument/showSyntaxTree"
         show_syntax_tree(uri, request.dig(:params, :range))
+      when "textDocument/prepareTypeHierarchy"
+        $stderr.puts("I'm at prepareTypeHierarchy!")
+
+        # code_range = Interface::Range.new(
+        #   start: Interface::Position.new(line: 1, character: 1),
+        #   end: Interface::Position.new(line: 9, character: 4),
+        # )
+
+        # class_name_range = Interface::Range.new(
+        #   start: Interface::Position.new(line: 3, character: 7),
+        #   end: Interface::Position.new(line: 3, character: 25),
+        # )
+
+        ## returning below causes "missing PROVIDER" issues
+
+        # [
+        #   Interface::TypeHierarchyItem.new(
+        #     name: "ApplicationService",
+        #     kind: Constant::SymbolKind::CLASS,
+        #     uri: "file:///Users/joey/src/github.com/Shopify/kepler/app/services/application_service.rb",
+        #     range: code_range,
+        #     selection_range: Interface::SelectionRange.new(range: class_name_range),
+        #   ),
+        # ]
+
+        # returning nil works as expected, shows "No results."
+        nil
       end
     end
 
@@ -497,6 +525,12 @@ module RubyLsp
         Interface::FoldingRangeClientCapabilities.new(line_folding_only: true)
       end
 
+      type_hierarchy_provider = if enabled_features["typeHierarchy"]
+        Interface::TypeHierarchyRegistrationOptions.new(
+          document_selector: { scheme: "file", language: "ruby" },
+        )
+      end
+
       semantic_tokens_provider = if enabled_features["semanticHighlighting"]
         Interface::SemanticTokensRegistrationOptions.new(
           document_selector: { scheme: "file", language: "ruby" },
@@ -551,6 +585,7 @@ module RubyLsp
           document_link_provider: document_link_provider,
           folding_range_provider: folding_ranges_provider,
           semantic_tokens_provider: semantic_tokens_provider,
+          type_hierarchy_provider: type_hierarchy_provider,
           document_formatting_provider: enabled_features["formatting"] && formatter != "none",
           document_highlight_provider: enabled_features["documentHighlights"],
           code_action_provider: code_action_provider,
