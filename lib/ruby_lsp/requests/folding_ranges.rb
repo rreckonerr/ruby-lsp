@@ -20,43 +20,43 @@ module RubyLsp
 
       SIMPLE_FOLDABLES = T.let(
         [
-          SyntaxTree::ArrayLiteral,
-          SyntaxTree::BlockNode,
-          SyntaxTree::Case,
-          SyntaxTree::ClassDeclaration,
-          SyntaxTree::For,
-          SyntaxTree::HashLiteral,
-          SyntaxTree::Heredoc,
-          SyntaxTree::ModuleDeclaration,
-          SyntaxTree::SClass,
-          SyntaxTree::UnlessNode,
-          SyntaxTree::UntilNode,
-          SyntaxTree::WhileNode,
-          SyntaxTree::Else,
-          SyntaxTree::Ensure,
-          SyntaxTree::Begin,
+          YARP::ArrayNode,
+          YARP::BlockNode,
+          YARP::CaseNode,
+          YARP::ClassNode,
+          YARP::ForNode,
+          YARP::HashNode,
+          # SyntaxTree::Heredoc,
+          YARP::ModuleNode,
+          YARP::StatementsNode, # is this equivalent to SyntaxTree::SClass?
+          YARP::UnlessNode,
+          YARP::UntilNode,
+          YARP::UntilNode,
+          YARP::ElseNode,
+          YARP::EnsureNode,
+          YARP::BeginNode,
         ].freeze,
-        T::Array[T.class_of(SyntaxTree::Node)],
+        T::Array[T.class_of(YARP::Node)],
       )
 
       NODES_WITH_STATEMENTS = T.let(
         [
-          SyntaxTree::IfNode,
-          SyntaxTree::Elsif,
-          SyntaxTree::In,
-          SyntaxTree::Rescue,
-          SyntaxTree::When,
+          YARP::IfNode,
+          # SyntaxTree::Elsif,
+          YARP::InNode,
+          YARP::RescueNode,
+          YARP::WhenNode,
         ].freeze,
-        T::Array[T.class_of(SyntaxTree::Node)],
+        T::Array[T.class_of(YARP::Node)],
       )
 
       StatementNode = T.type_alias do
         T.any(
-          SyntaxTree::IfNode,
-          SyntaxTree::Elsif,
-          SyntaxTree::In,
-          SyntaxTree::Rescue,
-          SyntaxTree::When,
+          YARP::IfNode,
+          # SyntaxTree::Elsif,
+          YARP::InNode,
+          YARP::RescueNode,
+          YARP::WhenNode,
         )
       end
 
@@ -70,17 +70,15 @@ module RubyLsp
 
       sig { override.returns(T.all(T::Array[Interface::FoldingRange], Object)) }
       def run
-        if @document.parsed?
-          visit(@document.tree)
-          emit_partial_range
-        end
+        visit(@document.tree)
+        emit_partial_range
 
         @ranges
       end
 
       private
 
-      sig { override.params(node: T.nilable(SyntaxTree::Node)).void }
+      sig { override.params(node: T.nilable(YARP::Node)).void }
       def visit(node)
         return unless handle_partial_range(node)
 
@@ -90,7 +88,7 @@ module RubyLsp
           add_lines_range(location.start_line, location.end_line - 1)
         when *NODES_WITH_STATEMENTS
           add_statements_range(T.must(node), T.cast(node, StatementNode).statements)
-        when SyntaxTree::CallNode, SyntaxTree::CommandCall
+        when YARP::CallNode
           # If there is a receiver, it may be a chained invocation,
           # so we need to process it in special way.
           if node.receiver.nil?
@@ -100,14 +98,14 @@ module RubyLsp
             add_call_range(node)
             return
           end
-        when SyntaxTree::Command
-          unless same_lines_for_command_and_block?(node)
-            location = node.location
-            add_lines_range(location.start_line, location.end_line - 1)
-          end
-        when SyntaxTree::DefNode
+        # when SyntaxTree::Command
+        #   unless same_lines_for_command_and_block?(node)
+        #     location = node.location
+        #     add_lines_range(location.start_line, location.end_line - 1)
+        #   end
+        when YARP::DefNode
           add_def_range(node)
-        when SyntaxTree::StringConcat
+        when YARP::StringConcatNode
           add_string_concat(node)
           return
         end
@@ -116,7 +114,7 @@ module RubyLsp
       end
 
       # This is to prevent duplicate ranges
-      sig { params(node: T.any(SyntaxTree::Command, SyntaxTree::CommandCall)).returns(T::Boolean) }
+      sig { params(node: YARP::CallNode).returns(T::Boolean) }
       def same_lines_for_command_and_block?(node)
         node_block = node.block
         return false unless node_block
@@ -138,7 +136,7 @@ module RubyLsp
         class << self
           extend T::Sig
 
-          sig { params(node: SyntaxTree::Node, kind: String).returns(PartialRange) }
+          sig { params(node: YARP::Node, kind: String).returns(PartialRange) }
           def from(node, kind)
             new(node.location.start_line - 1, node.location.end_line - 1, kind)
           end
@@ -151,13 +149,13 @@ module RubyLsp
           @kind = kind
         end
 
-        sig { params(node: SyntaxTree::Node).returns(PartialRange) }
+        sig { params(node: YARP::Node).returns(PartialRange) }
         def extend_to(node)
           @end_line = node.location.end_line - 1
           self
         end
 
-        sig { params(node: SyntaxTree::Node).returns(T::Boolean) }
+        sig { params(node: YARP::Node).returns(T::Boolean) }
         def new_section?(node)
           node.is_a?(SyntaxTree::Comment) && @end_line + 1 != node.location.start_line - 1
         end
@@ -177,7 +175,7 @@ module RubyLsp
         end
       end
 
-      sig { params(node: T.nilable(SyntaxTree::Node)).returns(T::Boolean) }
+      sig { params(node: T.nilable(YARP::Node)).returns(T::Boolean) }
       def handle_partial_range(node)
         kind = partial_range_kind(node)
 
@@ -199,12 +197,12 @@ module RubyLsp
         false
       end
 
-      sig { params(node: T.nilable(SyntaxTree::Node)).returns(T.nilable(String)) }
+      sig { params(node: T.nilable(YARP::Node)).returns(T.nilable(String)) }
       def partial_range_kind(node)
         case node
-        when SyntaxTree::Comment
-          "comment"
-        when SyntaxTree::Command
+        # when SyntaxTree::Comment
+        #   "comment"
+        when YARP::CallNode
           if node.message.value == "require" || node.message.value == "require_relative"
             "imports"
           end
@@ -219,13 +217,13 @@ module RubyLsp
         @partial_range = nil
       end
 
-      sig { params(node: T.any(SyntaxTree::CallNode, SyntaxTree::CommandCall)).void }
+      sig { params(node: YARP::CallNode).void }
       def add_call_range(node)
-        receiver = T.let(node.receiver, T.nilable(SyntaxTree::Node))
+        receiver = T.let(node.receiver, T.nilable(YARP::Node))
 
         loop do
           case receiver
-          when SyntaxTree::CallNode
+          when YARP::CallNode
             visit(receiver.arguments)
             receiver = receiver.receiver
           when SyntaxTree::MethodAddBlock
@@ -253,7 +251,7 @@ module RubyLsp
         visit(node.block) if node.is_a?(SyntaxTree::CommandCall)
       end
 
-      sig { params(node: SyntaxTree::DefNode).void }
+      sig { params(node: YARP::DefNode).void }
       def add_def_range(node)
         # For an endless method with no arguments, `node.params` returns `nil` for Ruby 3.0, but a `Syntax::Params`
         # for Ruby 3.1
@@ -277,17 +275,17 @@ module RubyLsp
         end
       end
 
-      sig { params(node: SyntaxTree::Node, statements: SyntaxTree::Statements).void }
+      sig { params(node: YARP::Node, statements: YARP::StatementsNode).void }
       def add_statements_range(node, statements)
         return if statements.empty?
 
         add_lines_range(node.location.start_line, T.must(statements.body.last).location.end_line)
       end
 
-      sig { params(node: SyntaxTree::StringConcat).void }
+      sig { params(node: YARP::StringConcat).void }
       def add_string_concat(node)
-        left = T.let(node.left, SyntaxTree::Node)
-        left = left.left while left.is_a?(SyntaxTree::StringConcat)
+        left = T.let(node.left, YARP::Node)
+        left = left.left while left.is_a?(YARP::StringConcatNode)
 
         add_lines_range(left.location.start_line, node.right.location.end_line - 1)
       end
