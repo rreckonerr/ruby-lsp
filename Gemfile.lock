@@ -1,5 +1,7 @@
-PATH
-  remote: ../yarp
+GIT
+  remote: https://github.com/Shopify/yarp.git
+  revision: 138de9b39820c14f4020b07836de55dce659eec7
+  branch: main
   specs:
     yarp (0.4.0)
 

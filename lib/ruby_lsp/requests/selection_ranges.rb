@@ -25,41 +25,37 @@ module RubyLsp
 
       NODES_THAT_CAN_BE_PARENTS = T.let(
         [
-          SyntaxTree::Assign,
-          SyntaxTree::ArrayLiteral,
-          SyntaxTree::Begin,
-          SyntaxTree::BlockNode,
-          SyntaxTree::CallNode,
-          SyntaxTree::Case,
-          SyntaxTree::ClassDeclaration,
-          SyntaxTree::Command,
-          SyntaxTree::DefNode,
-          SyntaxTree::Elsif,
-          SyntaxTree::Else,
-          SyntaxTree::EmbDoc,
-          SyntaxTree::Ensure,
-          SyntaxTree::For,
-          SyntaxTree::HashLiteral,
-          SyntaxTree::Heredoc,
-          SyntaxTree::HeredocBeg,
-          SyntaxTree::HshPtn,
-          SyntaxTree::IfNode,
-          SyntaxTree::In,
-          SyntaxTree::Lambda,
-          SyntaxTree::MethodAddBlock,
-          SyntaxTree::ModuleDeclaration,
-          SyntaxTree::Params,
-          SyntaxTree::Rescue,
-          SyntaxTree::RescueEx,
-          SyntaxTree::StringConcat,
-          SyntaxTree::StringLiteral,
-          SyntaxTree::UnlessNode,
-          SyntaxTree::UntilNode,
-          SyntaxTree::VCall,
-          SyntaxTree::When,
-          SyntaxTree::WhileNode,
+          # YARP::AssignNode,
+          YARP::ArrayNode,
+          YARP::BeginNode,
+          YARP::BlockNode,
+          YARP::CallNode,
+          YARP::CaseNode,
+          YARP::ClassNode,
+          # YARP::Comment, # not a YARP::Node
+          YARP::DefNode,
+          YARP::ElseNode,
+          YARP::EnsureNode,
+          YARP::ForNode,
+          YARP::HashNode,
+          # YARP::HeredocNode,
+          # YARP::HeredocBegNode,
+          YARP::HashPatternNode,
+          YARP::IfNode,
+          YARP::InNode,
+          YARP::LambdaNode,
+          YARP::ModuleNode,
+          YARP::ParametersNode,
+          YARP::RescueNode,
+          # YARP::RescueExNode
+          YARP::StringConcatNode,
+          #YARP::StringLiteralNode,
+          YARP::UnlessNode,
+          YARP::UntilNode,
+          YARP::WhenNode,
+          YARP::WhileNode
         ].freeze,
-        T::Array[T.class_of(SyntaxTree::Node)],
+        T::Array[T.class_of(YARP::Node)]
       )
 
       sig { params(document: Document).void }
@@ -72,13 +68,13 @@ module RubyLsp
 
       sig { override.returns(T.all(T::Array[Support::SelectionRange], Object)) }
       def run
-        visit(@document.tree) if @document.parsed?
+        visit(@document.tree)
         @ranges.reverse!
       end
 
       private
 
-      sig { override.params(node: T.nilable(SyntaxTree::Node)).void }
+      sig { override.params(node: T.nilable(YARP::Node)).void }
       def visit(node)
         return if node.nil?
 
@@ -94,7 +90,7 @@ module RubyLsp
 
       sig do
         params(
-          location: SyntaxTree::Location,
+          location: YARP::Location,
           parent: T.nilable(Support::SelectionRange),
         ).returns(Support::SelectionRange)
       end
