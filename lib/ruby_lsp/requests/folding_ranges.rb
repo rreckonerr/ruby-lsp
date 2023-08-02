@@ -26,9 +26,9 @@ module RubyLsp
           YARP::ClassNode,
           YARP::ForNode,
           YARP::HashNode,
-          # SyntaxTree::Heredoc,
+          YARP::InterpolatedStringNode,
           YARP::ModuleNode,
-          YARP::StatementsNode, # is this equivalent to SyntaxTree::SClass?
+          YARP::SingletonClassNode,
           YARP::UnlessNode,
           YARP::UntilNode,
           YARP::UntilNode,
@@ -42,8 +42,7 @@ module RubyLsp
       NODES_WITH_STATEMENTS = T.let(
         [
           YARP::IfNode,
-          # SyntaxTree::Elsif,
-          YARP::InNode,
+          # YARP::InNode,
           YARP::RescueNode,
           YARP::WhenNode,
         ].freeze,
@@ -53,7 +52,6 @@ module RubyLsp
       StatementNode = T.type_alias do
         T.any(
           YARP::IfNode,
-          # SyntaxTree::Elsif,
           YARP::InNode,
           YARP::RescueNode,
           YARP::WhenNode,
@@ -87,7 +85,8 @@ module RubyLsp
           location = T.must(node).location
           add_lines_range(location.start_line, location.end_line - 1)
         when *NODES_WITH_STATEMENTS
-          add_statements_range(T.must(node), T.cast(node, StatementNode).statements)
+          x = T.cast(node, StatementNode).statements
+          add_statements_range(T.must(node), x) if x
         when YARP::CallNode
           # If there is a receiver, it may be a chained invocation,
           # so we need to process it in special way.
@@ -157,7 +156,8 @@ module RubyLsp
 
         sig { params(node: YARP::Node).returns(T::Boolean) }
         def new_section?(node)
-          node.is_a?(SyntaxTree::Comment) && @end_line + 1 != node.location.start_line - 1
+          false
+          # node.is_a?(SyntaxTree::Comment) && @end_line + 1 != node.location.start_line - 1
         end
 
         sig { returns(Interface::FoldingRange) }
@@ -203,7 +203,7 @@ module RubyLsp
         # when SyntaxTree::Comment
         #   "comment"
         when YARP::CallNode
-          if node.message.value == "require" || node.message.value == "require_relative"
+          if node.message == "require" || node.message == "require_relative"
             "imports"
           end
         end
@@ -221,41 +221,26 @@ module RubyLsp
       def add_call_range(node)
         receiver = T.let(node.receiver, T.nilable(YARP::Node))
 
-        loop do
-          case receiver
-          when YARP::CallNode
-            visit(receiver.arguments)
-            receiver = receiver.receiver
-          when SyntaxTree::MethodAddBlock
-            visit(receiver.block)
-            receiver = receiver.call
+        while receiver.is_a?(YARP::CallNode)
+          visit(receiver.arguments)
+          receiver = receiver.receiver
 
-            if receiver.is_a?(SyntaxTree::CallNode) || receiver.is_a?(SyntaxTree::CommandCall)
-              receiver = receiver.receiver
-            end
-          else
-            break
-          end
-        end
-
-        if receiver
-          unless node.is_a?(SyntaxTree::CommandCall) && same_lines_for_command_and_block?(node)
+          if receiver
             add_lines_range(
-              receiver.location.start_line,
+              receiver.location.start_line - 1,
               node.location.end_line - 1,
             )
           end
         end
 
         visit(node.arguments)
-        visit(node.block) if node.is_a?(SyntaxTree::CommandCall)
       end
 
       sig { params(node: YARP::DefNode).void }
       def add_def_range(node)
         # For an endless method with no arguments, `node.params` returns `nil` for Ruby 3.0, but a `Syntax::Params`
         # for Ruby 3.1
-        params = node.params
+        params = node.parameters
         return unless params
 
         params_location = params.location
@@ -267,22 +252,17 @@ module RubyLsp
           add_lines_range(location.start_line, location.end_line - 1)
         end
 
-        bodystmt = node.bodystmt
-        if bodystmt.is_a?(SyntaxTree::BodyStmt)
-          visit(bodystmt.statements)
-        else
-          visit(bodystmt)
-        end
+        visit(node.statements)
       end
 
       sig { params(node: YARP::Node, statements: YARP::StatementsNode).void }
       def add_statements_range(node, statements)
-        return if statements.empty?
+        return if statements.child_nodes.empty?
 
-        add_lines_range(node.location.start_line, T.must(statements.body.last).location.end_line)
+        add_lines_range(node.location.start_line, statements.body.last.location.end_line)
       end
 
-      sig { params(node: YARP::StringConcat).void }
+      sig { params(node: YARP::StringConcatNode).void }
       def add_string_concat(node)
         left = T.let(node.left, YARP::Node)
         left = left.left while left.is_a?(YARP::StringConcatNode)
