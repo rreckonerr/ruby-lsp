@@ -42,7 +42,7 @@ module RubyLsp
 
           sig do
             params(
-              node: T.any(SyntaxTree::CallNode, SyntaxTree::VCall),
+              node: YARP::CallNode,
             ).returns(T::Boolean)
           end
           def annotation?(node)
@@ -52,55 +52,56 @@ module RubyLsp
 
             return false unless annotation.supports_receiver?(receiver_name(node))
 
-            annotation.supports_arity?(node.arity)
+            annotation.supports_arity?(node.arguments&.arguments&.size || 0)
           end
 
           private
 
-          sig { params(node: T.any(SyntaxTree::CallNode, SyntaxTree::VCall)).returns(T.nilable(Annotation)) }
+          sig { params(node: YARP::CallNode).returns(T.nilable(Annotation)) }
           def annotation(node)
             case node
-            when SyntaxTree::VCall
-              ANNOTATIONS[node.value.value]
-            when SyntaxTree::CallNode
+            # when SyntaxTree::VCall
+            #   ANNOTATIONS[node.value.value]
+            when YARP::CallNode
               message = node.message
-              ANNOTATIONS[message.value] unless message.is_a?(Symbol)
+              ANNOTATIONS[node.name] unless message.is_a?(Symbol)
             else
               T.absurd(node)
             end
           end
 
           sig do
-            params(receiver: T.any(SyntaxTree::CallNode, SyntaxTree::VCall)).returns(T.nilable(String))
+            params(receiver: YARP::CallNode).returns(T.nilable(String))
           end
           def receiver_name(receiver)
             case receiver
-            when SyntaxTree::CallNode
+            when YARP::CallNode
               node_name(receiver.receiver)
-            when SyntaxTree::VCall
-              nil
+            # when SyntaxTree::VCall
+            #   nil
             else
               T.absurd(receiver)
             end
           end
 
           sig do
-            params(node: T.nilable(SyntaxTree::Node)).returns(T.nilable(String))
+            params(node: T.nilable(YARP::Node)).returns(T.nilable(String))
           end
           def node_name(node)
             case node
-            when SyntaxTree::VarRef
-              node.value.value
-            when SyntaxTree::CallNode
-              node_name(node.receiver)
-            when SyntaxTree::VCall
-              node_name(node.value)
-            when SyntaxTree::Ident, SyntaxTree::Backtick, SyntaxTree::Const, SyntaxTree::Op
-              node.value
-            when NilClass, SyntaxTree::Node
-              nil
-            else
-              T.absurd(node)
+            when YARP::LocalVariableReadNode # TODO: consider the other kinds of variable nodes?
+              node.constant_id
+            # when YARP::CallNode
+            #   node_name(node.receiver)
+            # when SyntaxTree::VCall
+            #   node_name(node.value)
+            # also need to consider YARP::InterpolatedXStringNode?
+            # when SyntaxTree::Ident, YARP::XStringNode, YARP::ConstantReadNode # , SyntaxTree::Op
+            #   node.value
+            # when NilClass, YARP::Node
+            #   nil
+            # else
+            #   T.absurd(node)
             end
           end
         end
