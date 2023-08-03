@@ -147,11 +147,10 @@ module RubyLsp
         return unless visible?(node, @range)
 
         message = node.message
-        # debugger
-        # if !message.is_a?(Symbol) && !special_method?(message.value)
-        #   type = Support::Sorbet.annotation?(node) ? :type : :method
-        #   add_token(message.location, type)
-        # end
+        if !special_method?(message)
+          type = Support::Sorbet.annotation?(node) ? :type : :method
+          add_token(node.location, type)
+        end
       end
 
       # sig { params(node: SyntaxTree::Command).void }
@@ -189,6 +188,7 @@ module RubyLsp
 
       sig { params(node: YARP::KeywordParameterNode).void }
       def on_kw(node)
+        raise 'hit'
         return unless visible?(node, @range)
 
         case node.value
@@ -213,7 +213,7 @@ module RubyLsp
         rest = node.keyword_rest
         if rest && !rest.is_a?(YARP::ForwardingArgumentsNode) && !rest.is_a?(Symbol)
           name = rest.location.slice
-          add_token(name.location, :parameter) if name
+          add_token(rest.location, :parameter) if name
         end
       end
 
