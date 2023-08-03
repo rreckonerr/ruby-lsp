@@ -103,7 +103,7 @@ module RubyLsp
             ),
             end: Interface::Position.new(
               line: location.end_line - 1,
-              character: location.end_column,
+              character: location.end_column + 1, # TODO - understand why this is needed
             ),
           ),
           parent: parent,
