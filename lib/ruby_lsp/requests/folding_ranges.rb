@@ -31,7 +31,7 @@ module RubyLsp
           YARP::SingletonClassNode,
           YARP::UnlessNode,
           YARP::UntilNode,
-          YARP::UntilNode,
+          YARP::WhileNode,
           YARP::ElseNode,
           YARP::EnsureNode,
           YARP::BeginNode,
@@ -233,7 +233,7 @@ module RubyLsp
           end
         end
 
-        visit(node.arguments)
+        visit(node.block)
       end
 
       sig { params(node: YARP::DefNode).void }
