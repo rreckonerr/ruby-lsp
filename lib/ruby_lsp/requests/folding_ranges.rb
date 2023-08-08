@@ -240,18 +240,20 @@ module RubyLsp
       def add_def_range(node)
         # For an endless method with no arguments, `node.params` returns `nil` for Ruby 3.0, but a `Syntax::Params`
         # for Ruby 3.1
-        # params = node.parameters
+        params = node.parameters
         # debugger
         # return unless params
 
-        # params_location = params.location
+        params_location = params.location
+        # debugger
 
-        # if params_location.start_line < params_location.end_line
-        #   add_lines_range(params_location.end_line, node.location.end_line - 1)
-        # else
+        if params_location.start_line < params_location.end_line
+          # debugger
+          add_lines_range(params_location.start_line, node.location.end_line - 1)
+        else
           location = node.location
           add_lines_range(location.start_line, location.end_line - 1)
-        # end
+        end
 
         visit(node.statements)
       end
