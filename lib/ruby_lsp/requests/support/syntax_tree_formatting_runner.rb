@@ -1,8 +1,13 @@
 # typed: strict
 # frozen_string_literal: true
 
-require "syntax_tree/cli"
+begin
+  require "syntax_tree/cli"
+rescue LoadError
+  return
+end
 require "singleton"
+
 
 module RubyLsp
   module Requests
