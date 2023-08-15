@@ -100,6 +100,12 @@ module RubyLsp
       super
     end
 
+    sig { override.params(node: YARP::ConstantWriteNode).void }
+    def visit_constant_write_node(node)
+      @listeners[:on_constant_write_node]&.each { |l| T.unsafe(l).on_constant_write_node(node) }
+      super
+    end
+
     sig { override.params(node: YARP::InstanceVariableWriteNode).void }
     def visit_instance_variable_write_node(node)
       @listeners[:on_instance_variable_write_node]&.each { |l| T.unsafe(l).on_instance_variable_write_node(node) }
