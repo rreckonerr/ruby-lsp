@@ -102,8 +102,8 @@ module RubyLsp
           :after_def,
           :on_module,
           :after_module,
-          :on_instance_variable_write_node,
-          :on_class_variable_write_node,
+          :on_instance_variable_write,
+          :on_class_variable_write,
         )
       end
 
@@ -194,7 +194,7 @@ module RubyLsp
       end
 
       sig { params(node: YARP::InstanceVariableWriteNode).void }
-      def on_instance_variable_write_node(node)
+      def on_instance_variable_write(node)
         create_document_symbol(
           name: node.name,
           kind: :variable,
@@ -204,7 +204,7 @@ module RubyLsp
       end
 
       sig { params(node: YARP::ClassVariableWriteNode).void }
-      def on_class_variable_write_node(node)
+      def on_class_variable_write(node)
         create_document_symbol(
           name: node.name,
           kind: :variable,

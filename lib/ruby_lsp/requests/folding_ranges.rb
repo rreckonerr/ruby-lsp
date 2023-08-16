@@ -82,20 +82,28 @@ module RubyLsp
 
         case node
         when *SIMPLE_FOLDABLES
-          location = T.must(node).location
-          add_lines_range(location.start_line, location.end_line - 1)
+          if node.is_a?(YARP::BeginNode) && node.rescue_clause
+            add_lines_range(node.rescue_clause.location.start_line, node.location.end_line - 1)
+          else
+            location = T.must(node).location
+            add_lines_range(location.start_line, location.end_line - 1)
+          end
         when *NODES_WITH_STATEMENTS
           x = T.cast(node, StatementNode).statements
           add_statements_range(T.must(node), x) if x
         when YARP::CallNode
           # If there is a receiver, it may be a chained invocation,
           # so we need to process it in special way.
-          if node.receiver.nil?
-            location = node.location
-            add_lines_range(location.start_line, location.end_line - 1)
-          else
-            add_call_range(node)
-            return
+          # debugger
+          # unless node.block && node.location.start_line == node.block.location.start_line
+          unless same_lines_for_call_and_block?(node)
+            if node.receiver.nil?
+              location = node.location
+              add_lines_range(location.start_line, location.end_line - 1)
+            else
+              add_call_range(node)
+              return
+            end
           end
         # when SyntaxTree::Command
         #   unless same_lines_for_command_and_block?(node)
@@ -103,6 +111,7 @@ module RubyLsp
         #     add_lines_range(location.start_line, location.end_line - 1)
         #   end
         when YARP::DefNode
+          debugger
           add_def_range(node)
         when YARP::StringConcatNode
           add_string_concat(node)
@@ -114,7 +123,7 @@ module RubyLsp
 
       # This is to prevent duplicate ranges
       sig { params(node: YARP::CallNode).returns(T::Boolean) }
-      def same_lines_for_command_and_block?(node)
+      def same_lines_for_call_and_block?(node)
         node_block = node.block
         return false unless node_block
 
@@ -244,16 +253,19 @@ module RubyLsp
         # debugger
         # return unless params
 
-        params_location = params.location
+        # params_location = params.location
         # debugger
+        return unless node.statements
 
-        if params_location.start_line < params_location.end_line
+        # if params_location.start_line < params_location.end_line
           # debugger
-          add_lines_range(params_location.start_line, node.location.end_line - 1)
-        else
-          location = node.location
-          add_lines_range(location.start_line, location.end_line - 1)
-        end
+        #   add_lines_range(params_location.start_line, node.location.end_line - 1)
+        # else
+        # debugger
+          # location = node.location
+          # add_lines_range(location.start_line, location.end_line - 1)
+          add_lines_range(node.statements.location.start_line - 1, node.statements.location.end_line)
+        # end
 
         visit(node.statements)
       end
