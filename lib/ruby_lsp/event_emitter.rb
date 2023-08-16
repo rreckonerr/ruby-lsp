@@ -54,55 +54,30 @@ module RubyLsp
       super
     end
 
-    sig { override.params(node: SyntaxTree::ClassDeclaration).void }
-    def visit_class(node)
+    sig { override.params(node: YARP::ClassNode).void }
+    def visit_class_node(node)
       @listeners[:on_class]&.each { |l| T.unsafe(l).on_class(node) }
       super
       @listeners[:after_class]&.each { |l| T.unsafe(l).after_class(node) }
     end
 
-    sig { override.params(node: SyntaxTree::ModuleDeclaration).void }
-    def visit_module(node)
+    sig { override.params(node: YARP::ModuleNode).void }
+    def visit_module_node(node)
       @listeners[:on_module]&.each { |l| T.unsafe(l).on_module(node) }
       super
       @listeners[:after_module]&.each { |l| T.unsafe(l).after_module(node) }
     end
 
-    sig { override.params(node: SyntaxTree::Command).void }
-    def visit_command(node)
-      @listeners[:on_command]&.each { |l| T.unsafe(l).on_command(node) }
-      super
-      @listeners[:after_command]&.each { |l| T.unsafe(l).after_command(node) }
-    end
-
-    sig { override.params(node: SyntaxTree::CommandCall).void }
-    def visit_command_call(node)
-      @listeners[:on_command_call]&.each { |l| T.unsafe(l).on_command_call(node) }
-      super
-    end
-
-    sig { override.params(node: SyntaxTree::CallNode).void }
-    def visit_call(node)
+    sig { override.params(node: YARP::CallNode).void }
+    def visit_call_node(node)
       @listeners[:on_call]&.each { |l| T.unsafe(l).on_call(node) }
       super
       @listeners[:after_call]&.each { |l| T.unsafe(l).after_call(node) }
     end
 
-    sig { override.params(node: SyntaxTree::VCall).void }
-    def visit_vcall(node)
-      @listeners[:on_vcall]&.each { |l| T.unsafe(l).on_vcall(node) }
-      super
-    end
-
     sig { override.params(node: YARP::ConstantPathWriteNode).void }
     def visit_constant_path_write_node(node)
       @listeners[:on_constant_path_write_node]&.each { |l| T.unsafe(l).on_constant_path_write_node(node) }
-      super
-    end
-
-    sig { override.params(node: YARP::ConstantWriteNode).void }
-    def visit_constant_write_node(node)
-      @listeners[:on_constant_write_node]&.each { |l| T.unsafe(l).on_constant_write_node(node) }
       super
     end
 
@@ -118,21 +93,8 @@ module RubyLsp
       super
     end
 
-    # sig { override.params(node: SyntaxTree::ConstPathField).void }
-    # def visit_const_path_field(node)
-    #   @listeners[:on_const_path_field]&.each { |l| T.unsafe(l).on_const_path_field(node) }
-    #   super
-    # end
-
-    # sig { override.params(node: SyntaxTree::TopConstField).void }
-    # def visit_top_const_field(node)
-    #   @listeners[:on_top_const_field]&.each { |l| T.unsafe(l).on_top_const_field(node) }
-    #   super
-    # end
-
     sig { override.params(node: YARP::DefNode).void }
     def visit_def_node(node)
-      # ???
       @listeners[:on_def]&.each { |l| T.unsafe(l).on_def(node) }
       super
       @listeners[:after_def]&.each { |l| T.unsafe(l).after_def(node) }
@@ -198,8 +160,8 @@ module RubyLsp
       @listeners[:after_binary]&.each { |l| T.unsafe(l).after_binary(node) }
     end
 
-    sig { override.params(node: SyntaxTree::Const).void }
-    def visit_const(node)
+    sig { override.params(node: YARP::ConstNode).void }
+    def visit_const_node(node)
       @listeners[:on_const]&.each { |l| T.unsafe(l).on_const(node) }
       super
     end

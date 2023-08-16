@@ -98,7 +98,6 @@ module RubyLsp
           :after_class,
           :on_call,
           :on_constant_path_write_node,
-          :on_constant_write_node,
           :on_def,
           :after_def,
           :on_module,
@@ -151,17 +150,6 @@ module RubyLsp
           selection_range_node: node.target,
         )
       end
-
-      # sig { params(node: YARP::ConstantWriteNode).void }
-      # def on_constant_write_node(node)
-      #   create_document_symbol(
-      #     name: node.location.slice,
-      #     kind: :constant,
-      #     range_node: node,
-      #     selection_range_node: node.name_loc
-      #   )
-      # end
-
 
       sig { params(node: YARP::DefNode).void }
       def on_def(node)
