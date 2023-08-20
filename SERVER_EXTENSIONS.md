@@ -154,12 +154,12 @@ module RubyLsp
 
       # Listeners must define methods for each event they registered with the emitter. In this case, we have to define
       # `on_const` to specify what this listener should do every time we find a constant
-      sig { params(node: SyntaxTree::Const).void }
-      def on_const(node)
+      sig { params(node: YARP::ConstantReadNode).void }
+      def on_constant_read_node(node)
         # Certain helpers are made available to listeners to build LSP responses. The classes under `RubyLsp::Interface`
         # are generally used to build responses and they match exactly what the specification requests.
         contents = RubyLsp::Interface::MarkupContent.new(kind: "markdown", value: "Hello!")
-        @response = RubyLsp::Interface::Hover.new(range: range_from_syntax_tree_node(node), contents: contents)
+        @response = RubyLsp::Interface::Hover.new(range: range_from_location(node.location), contents: contents)
       end
     end
   end
