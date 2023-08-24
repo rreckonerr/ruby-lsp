@@ -21,6 +21,7 @@ module RubyLsp
       SIMPLE_FOLDABLES = T.let(
         [
           YARP::ArrayNode,
+          YARP::BlockNode,
           YARP::CaseNode,
           YARP::ClassNode,
           YARP::ForNode,
@@ -42,7 +43,6 @@ module RubyLsp
       NODES_WITH_STATEMENTS = T.let(
         [
           YARP::IfNode,
-          YARP::BlockNode, # moved from SIMPLE_FOLDABLES
           # YARP::ElsifNode,,
           YARP::InNode,
           YARP::RescueNode,
@@ -83,6 +83,9 @@ module RubyLsp
       def visit(node)
         return unless handle_partial_range(node)
 
+        # BlockParametersNode, ClassNode, DefNode, LambdaNode, ModuleNode, ParenthesesNode, and SingletonClassNode have had their statements field renamed to body to give a hint that it might not be a StatementsNode (it could also be a BeginNode).
+        #
+
         case node
         when *SIMPLE_FOLDABLES
           location = T.must(node).location
@@ -92,17 +95,17 @@ module RubyLsp
         when YARP::CallNode
           location = node.location
           add_lines_range(location.start_line, location.end_line - 1)
-          # If there is a receiver, it may be a chained invocation,
-          # so we need to process it in special way.
-          # if node.receiver.nil?
-          #   location = node.location
-          #   debugger
-          #   add_lines_range(location.start_line, location.end_line - 1)
-          # else
-          #   debugger
-          #   add_call_range(node)
-          #   return
-          # end
+        # If there is a receiver, it may be a chained invocation,
+        # so we need to process it in special way.
+        # if node.receiver.nil?
+        #   location = node.location
+        #   debugger
+        #   add_lines_range(location.start_line, location.end_line - 1)
+        # else
+        #   debugger
+        #   add_call_range(node)
+        #   return
+        # end
         # when SyntaxTree::Command
         #   unless same_lines_for_command_and_block?(node)
         #     location = node.location
@@ -263,10 +266,10 @@ module RubyLsp
         # params = node.parameters
         # debugger
 
-        if node.statements
-        add_lines_range(node.statements.location.start_line - 1, node.statements.location.end_line)
+        if node.body
+          add_lines_range(node.body.location.start_line - 1, node.body.location.end_line)
         else
-        add_lines_range(node.location.start_line, node.location.end_line)
+          add_lines_range(node.location.start_line, node.location.end_line)
         end
         # return unless params
 
@@ -285,7 +288,7 @@ module RubyLsp
         # else
         #   visit(bodystmt)
         # end
-        visit node.statements
+        visit(node.body)
       end
 
       sig { params(node: YARP::Node, statements: YARP::StatementsNode).void }
