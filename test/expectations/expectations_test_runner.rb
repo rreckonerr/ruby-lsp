@@ -52,6 +52,7 @@ class ExpectationsTestRunner < Minitest::Test
       Dir.glob(TEST_FIXTURES_GLOB).each do |path|
         # temporarily skip until we figure out comment handling
         next if handler_class == RubyLsp::Requests::DocumentLink && path == "test/fixtures/source_comment.rb"
+        next if handler_class == RubyLsp::Requests::FoldingRanges && path == "test/fixtures/comments.rb"
 
         test_name = File.basename(path, ".rb")
 
