@@ -20,20 +20,20 @@ module RubyLsp
 
       SIMPLE_FOLDABLES = T.let(
         [
-          # SyntaxTree::ArrayLiteral,
-          # SyntaxTree::BlockNode,
+          YARP::ArrayNode,
           YARP::CaseNode,
           YARP::ClassNode,
           YARP::ForNode,
           YARP::HashNode,
           # SyntaxTree::Heredoc,
+          YARP::InterpolatedStringNode,
           YARP::ModuleNode,
           YARP::SingletonClassNode,
           YARP::UnlessNode,
           YARP::UntilNode,
           YARP::WhileNode,
           YARP::ElseNode,
-          # SyntaxTree::Ensure,
+          YARP::EnsureNode,
           YARP::BeginNode,
         ].freeze,
         T::Array[T.class_of(YARP::Node)],
@@ -42,6 +42,7 @@ module RubyLsp
       NODES_WITH_STATEMENTS = T.let(
         [
           YARP::IfNode,
+          YARP::BlockNode, # moved from SIMPLE_FOLDABLES
           # YARP::ElsifNode,,
           YARP::InNode,
           YARP::RescueNode,
@@ -87,17 +88,21 @@ module RubyLsp
           location = T.must(node).location
           add_lines_range(location.start_line, location.end_line - 1)
         when *NODES_WITH_STATEMENTS
-          add_statements_range(T.must(node), T.must(node).statements)
+          add_statements_range(T.must(node), T.must(node).statements) if node.statements
         when YARP::CallNode
+          location = node.location
+          add_lines_range(location.start_line, location.end_line - 1)
           # If there is a receiver, it may be a chained invocation,
           # so we need to process it in special way.
-          if node.receiver.nil?
-            location = node.location
-            add_lines_range(location.start_line, location.end_line - 1)
-          else
-            add_call_range(node)
-            return
-          end
+          # if node.receiver.nil?
+          #   location = node.location
+          #   debugger
+          #   add_lines_range(location.start_line, location.end_line - 1)
+          # else
+          #   debugger
+          #   add_call_range(node)
+          #   return
+          # end
         # when SyntaxTree::Command
         #   unless same_lines_for_command_and_block?(node)
         #     location = node.location
@@ -248,24 +253,31 @@ module RubyLsp
         end
 
         visit(node.arguments)
-        visit(node.block) if node.is_a?(SyntaxTree::CommandCall)
+        visit(node.block) if node.is_a?(YARP::BlockNode)
       end
 
       sig { params(node: YARP::DefNode).void }
       def add_def_range(node)
         # For an endless method with no arguments, `node.params` returns `nil` for Ruby 3.0, but a `Syntax::Params`
         # for Ruby 3.1
-        params = node.parameters
-        return unless params
+        # params = node.parameters
+        # debugger
 
-        params_location = params.location
-
-        if params_location.start_line < params_location.end_line
-          add_lines_range(params_location.end_line, node.location.end_line - 1)
+        if node.statements
+        add_lines_range(node.statements.location.start_line - 1, node.statements.location.end_line)
         else
-          location = node.location
-          add_lines_range(location.start_line, location.end_line - 1)
+        add_lines_range(node.location.start_line, node.location.end_line)
         end
+        # return unless params
+
+        # params_location = params.location
+
+        # if params_location.start_line < params_location.end_line
+        #   add_lines_range(params_location.end_line, node.location.end_line - 1)
+        # else
+        #   location = node.location
+        #   add_lines_range(location.start_line, location.end_line - 1)
+        # end
 
         # bodystmt = node.bodystmt
         # if bodystmt.is_a?(YARP::StatementsNode)
