@@ -108,28 +108,22 @@ class CodeLensExpectationsTest < ExpectationsTestRunner
   def test_code_lens_extensions
     skip
 
-    message_queue = Thread::Queue.new
-    create_code_lens_extension
-
-    store = RubyLsp::Store.new
-    store.set(uri: URI("file:///fake.rb"), source: <<~RUBY, version: 1)
+    source = <<~RUBY
       class Test < Minitest::Test; end
     RUBY
 
-    response = RubyLsp::Executor.new(store, message_queue).execute({
-      method: "textDocument/codeLens",
-      params: { textDocument: { uri: "file:///fake.rb" }, position: { line: 1, character: 2 } },
-    }).response
+    test_extension(:create_code_lens_extension, source: source) do |executor|
+      response = executor.execute({
+        method: "textDocument/codeLens",
+        params: { textDocument: { uri: "file:///fake.rb" }, position: { line: 1, character: 2 } },
+      }).response
 
-    assert_equal(response.size, 4)
-    assert_match("Run", response[0].command.title)
-    assert_match("Run In Terminal", response[1].command.title)
-    assert_match("Debug", response[2].command.title)
-    assert_match("Run Test", response[3].command.title)
-  ensure
-    RubyLsp::Extension.extensions.clear
-    # had to comment out because `ensure` still runs even with `skip`
-    # T.must(message_queue).close
+      assert_equal(response.size, 4)
+      assert_match("Run", response[0].command.title)
+      assert_match("Run In Terminal", response[1].command.title)
+      assert_match("Debug", response[2].command.title)
+      assert_match("Run Test", response[3].command.title)
+    end
   end
 
   private

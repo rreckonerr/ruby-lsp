@@ -60,6 +60,10 @@ module RubyLsp
           T::Array[T.any(SymbolHierarchyRoot, Interface::DocumentSymbol)],
         )
 
+        @external_listeners.concat(
+          Extension.extensions.filter_map { |ext| ext.create_document_symbol_listener(emitter, message_queue) },
+        )
+
         emitter.register(
           self,
           :on_class,
@@ -74,6 +78,13 @@ module RubyLsp
           :on_instance_variable_write,
           :on_class_variable_write,
         )
+      end
+
+      # Merges responses from other listeners
+      sig { override.params(other: Listener[ResponseType]).returns(T.self_type) }
+      def merge_response!(other)
+        @response.concat(other.response)
+        self
       end
 
       sig { params(node: YARP::ClassNode).void }
