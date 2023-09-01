@@ -495,7 +495,7 @@ module RubyLsp
       return unless (argument.location.start_offset..argument.location.end_offset).cover?(char_position)
 
       emitter = EventEmitter.new
-      listener = Requests::PathCompletion.new(emitter, @message_queue)
+      listener = Requests::PathCompletion.new(@index, emitter, @message_queue)
       emitter.emit_for_target(argument)
       listener.response
     end
