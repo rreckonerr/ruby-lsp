@@ -64,8 +64,8 @@ class ShowSyntaxTreeTest < Minitest::Test
           [LocalVariableWriteNode(0...9)(
              :foo,
              0,
-             IntegerNode(6...9)(),
              (0...3),
+             IntegerNode(6...9)(),
              (4...5)
            )]
         )
@@ -93,13 +93,13 @@ class ShowSyntaxTreeTest < Minitest::Test
     }).response
 
     assert_equal(<<~AST, response[:ast])
-      LocalVariableWriteNode(0...9)(:foo, 0, IntegerNode(6...9)(), (0...3), (4...5))
+      LocalVariableWriteNode(0...9)(:foo, 0, (0...3), IntegerNode(6...9)(), (4...5))
 
       LocalVariableWriteNode(10...19)(
         :bar,
         0,
-        IntegerNode(16...19)(),
         (10...13),
+        IntegerNode(16...19)(),
         (14...15)
       )
     AST
