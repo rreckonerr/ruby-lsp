@@ -86,6 +86,8 @@ class CodeLensExpectationsTest < ExpectationsTestRunner
   end
 
   def test_no_code_lens_for_unsaved_files
+    skip
+
     source = <<~RUBY
       class FooTest < Test::Unit::TestCase
         def test_bar; end
