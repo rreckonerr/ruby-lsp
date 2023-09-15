@@ -14,7 +14,8 @@ module RubyIndexer
       indexables = @config.indexables
 
       assert(indexables.none? { |indexable| indexable.full_path.include?("test/fixtures") })
-      assert(indexables.none? { |indexable| indexable.full_path.include?("minitest-reporters") })
+      assert(indexables.none? { |indexable| indexable.gem_name == "minitest-reporters" })
+      assert(indexables.any? { |indexable| indexable.gem_name == "sorbet-runtime" })
       assert(indexables.none? { |indexable| indexable.full_path == __FILE__ })
     end
 

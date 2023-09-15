@@ -108,20 +108,21 @@ module RubyIndexer
           # If the default_path is a directory, we index all the Ruby files in it
           indexables.concat(
             Dir.glob(File.join(default_path, "**", "*.rb"), File::FNM_PATHNAME | File::FNM_EXTGLOB).map! do |path|
-              IndexablePath.new(RbConfig::CONFIG["rubylibdir"], path)
+              IndexablePath.new(RbConfig::CONFIG["rubylibdir"], path, gem_name: short_name)
             end,
           )
         else
           # If the default_path is a Ruby file, we index it
-          indexables << IndexablePath.new(RbConfig::CONFIG["rubylibdir"], default_path)
+          indexables << IndexablePath.new(RbConfig::CONFIG["rubylibdir"], default_path, gem_name: short_name)
         end
       end
 
       # Add the locked gems to the list of files to be indexed
       locked_gems&.each do |lazy_spec|
-        next if excluded_gems.include?(lazy_spec.name)
+        gem_name = lazy_spec.name
+        next if excluded_gems.include?(gem_name)
 
-        spec = Gem::Specification.find_by_name(lazy_spec.name)
+        spec = Gem::Specification.find_by_name(gem_name)
 
         # When working on a gem, it will be included in the locked_gems list. Since these are the project's own files,
         # we have already included and handled exclude patterns for it and should not re-include or it'll lead to
@@ -131,7 +132,9 @@ module RubyIndexer
         indexables.concat(
           spec.require_paths.flat_map do |require_path|
             load_path_entry = File.join(spec.full_gem_path, require_path)
-            Dir.glob(File.join(load_path_entry, "**", "*.rb")).map! { |path| IndexablePath.new(load_path_entry, path) }
+            Dir.glob(File.join(load_path_entry, "**", "*.rb")).map! do |path|
+              IndexablePath.new(load_path_entry, path, gem_name: gem_name)
+            end
           end,
         )
       rescue Gem::MissingSpecError
