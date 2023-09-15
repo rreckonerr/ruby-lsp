@@ -38,6 +38,9 @@ module RubyIndexer
 
     Value = type_member
 
+    sig { returns(Node[Value]) }
+    attr_reader :root
+
     sig { void }
     def initialize
       @root = T.let(Node.new("", ""), Node[Value])
@@ -90,7 +93,23 @@ module RubyIndexer
       end
     end
 
+    # Recursively insert the children of the `other` prefix tree into this one, merging both trees. The original tree is
+    # mutated
+    sig { params(other: PrefixTree[Value]).void }
+    def merge!(other)
+      other.root.children.values.each { |node| insert_child("", node) }
+    end
+
     private
+
+    # Recursively re-builds the full key for a child from the other tree, so that we can insert it with the correct
+    # prefix once we find the leaf
+    sig { params(prefix: String, child: Node[Value]).void }
+    def insert_child(prefix, child)
+      new_prefix = "#{prefix}#{child.key}"
+      insert(new_prefix, child.value) if child.leaf
+      child.children.values.each { |node| insert_child(new_prefix, node) }
+    end
 
     # Find a node that matches the given `key`
     sig { params(key: String).returns(T.nilable(Node[Value])) }

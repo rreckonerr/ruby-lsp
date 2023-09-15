@@ -146,5 +146,30 @@ module RubyIndexer
       tree.insert("foo/bar", 456)
       assert_equal([456], tree.search("foo/bar"))
     end
+
+    def test_merging_trees_with_conflicting_keys
+      tree = PrefixTree[Integer].new
+      tree.insert("abc", 1)
+      tree.insert("abcdef", 2)
+
+      other = PrefixTree[Integer].new
+      other.insert("qwe", 3)
+      other.insert("abcdefghi", 4)
+      tree.merge!(other)
+
+      assert_equal([3], tree.search("qwe"))
+      assert_equal([1, 2, 4], tree.search("abc"))
+    end
+
+    def test_merging_into_an_empty_tree
+      tree = PrefixTree[Integer].new
+      other = PrefixTree[Integer].new
+      other.insert("qwe", 3)
+      other.insert("abcdefghi", 4)
+      tree.merge!(other)
+
+      assert_equal([3], tree.search("qwe"))
+      assert_equal([4], tree.search("abc"))
+    end
   end
 end
