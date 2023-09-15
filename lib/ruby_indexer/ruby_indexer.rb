@@ -3,6 +3,7 @@
 
 require "yaml"
 require "did_you_mean"
+require "fileutils"
 
 require "ruby_indexer/lib/ruby_indexer/indexable_path"
 require "ruby_indexer/lib/ruby_indexer/visitor"

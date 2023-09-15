@@ -117,5 +117,15 @@ module RubyIndexer
         assert_match(regex, comment)
       end
     end
+
+    def test_indexables_include_gem_name_and_version
+      @config.load_config
+      indexables = @config.indexables
+
+      yarp_version = Gem::Specification.find_by_name("yarp").version.to_s
+      yarp_indexables = indexables.select { |ip| ip.gem_name == "yarp" }
+
+      assert(yarp_indexables.all? { |ip| ip.version == yarp_version })
+    end
   end
 end

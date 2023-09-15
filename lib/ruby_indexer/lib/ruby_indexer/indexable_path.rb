@@ -14,20 +14,36 @@ module RubyIndexer
     sig { returns(T.nilable(String)) }
     attr_reader :gem_name
 
+    sig { returns(T.nilable(String)) }
+    attr_reader :version
+
     # An IndexablePath is instantiated with a load_path_entry and a full_path. The load_path_entry is where the file can
     # be found in the $LOAD_PATH, which we use to determine the require_path. The load_path_entry may be `nil` if the
     # indexer is configured to go through files that do not belong in the $LOAD_PATH. For example,
     # `sorbet/tapioca/require.rb` ends up being a part of the paths to be indexed because it's a Ruby file inside the
     # project, but the `sorbet` folder is not a part of the $LOAD_PATH. That means that both its load_path_entry and
     # require_path will be `nil`, since it cannot be required by the project
-    sig { params(load_path_entry: T.nilable(String), full_path: String, gem_name: T.nilable(String)).void }
-    def initialize(load_path_entry, full_path, gem_name: nil)
+    sig do
+      params(
+        load_path_entry: T.nilable(String),
+        full_path: String,
+        gem_name: T.nilable(String),
+        version: T.nilable(String),
+      ).void
+    end
+    def initialize(load_path_entry, full_path, gem_name: nil, version: nil)
       @full_path = full_path
       @gem_name = gem_name
+      @version = version
       @require_path = T.let(
         load_path_entry ? Pathname.new(full_path).relative_path_from(load_path_entry).to_s.delete_suffix(".rb") : nil,
         T.nilable(String),
       )
+    end
+
+    sig { returns(T.nilable(String)) }
+    def cache_file_name
+      [@gem_name, @version].compact.join("-")
     end
   end
 end

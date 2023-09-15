@@ -8,27 +8,71 @@ module RubyIndexer
     # The minimum Jaro-Winkler similarity score for an entry to be considered a match for a given fuzzy search query
     ENTRY_SIMILARITY_THRESHOLD = 0.7
 
-    sig { void }
-    def initialize
+    # A type representing the structure of the cached index, returning the instance variables in an array:
+    # [@entries, @entries_tree, @files_to_entries, @require_paths_tree]
+    MarshalCacheType = T.type_alias do
+      [
+        T::Hash[String, T::Array[Entry]],
+        PrefixTree[T::Array[Entry]],
+        T::Hash[String, T::Array[Entry]],
+        PrefixTree[IndexablePath],
+      ]
+    end
+
+    # class << self
+    #   extend T::Sig
+
+    #   sig { params(tuple: MarshalCacheType).returns(Index) }
+    #   def _load(tuple)
+    #     Index.new(*tuple)
+    #   end
+    # end
+
+    sig { returns(T::Hash[String, T::Array[Entry]]) }
+    attr_reader :entries
+
+    sig { returns(PrefixTree[T::Array[Entry]]) }
+    attr_reader :entries_tree
+
+    sig { returns(T::Hash[String, T::Array[Entry]]) }
+    attr_reader :files_to_entries
+
+    sig { returns(PrefixTree[IndexablePath]) }
+    attr_reader :require_paths_tree
+
+    sig do
+      params(
+        entries: T::Hash[String, T::Array[Entry]],
+        entries_tree: PrefixTree[T::Array[Entry]],
+        files_to_entries: T::Hash[String, T::Array[Entry]],
+        require_paths_tree: PrefixTree[IndexablePath],
+      ).void
+    end
+    def initialize( # rubocop:disable Metrics/ParameterLists
+      entries = {},
+      entries_tree = PrefixTree[T::Array[Entry]].new,
+      files_to_entries = {},
+      require_paths_tree = PrefixTree[IndexablePath].new
+    )
       # Holds all entries in the index using the following format:
       # {
       #  "Foo" => [#<Entry::Class>, #<Entry::Class>],
       #  "Foo::Bar" => [#<Entry::Class>],
       # }
-      @entries = T.let({}, T::Hash[String, T::Array[Entry]])
+      @entries = entries
 
       # Holds all entries in the index using a prefix tree for searching based on prefixes to provide autocompletion
-      @entries_tree = T.let(PrefixTree[T::Array[Entry]].new, PrefixTree[T::Array[Entry]])
+      @entries_tree = entries_tree
 
       # Holds references to where entries where discovered so that we can easily delete them
       # {
       #  "/my/project/foo.rb" => [#<Entry::Class>, #<Entry::Class>],
       #  "/my/project/bar.rb" => [#<Entry::Class>],
       # }
-      @files_to_entries = T.let({}, T::Hash[String, T::Array[Entry]])
+      @files_to_entries = files_to_entries
 
       # Holds all require paths for every indexed item so that we can provide autocomplete for requires
-      @require_paths_tree = T.let(PrefixTree[IndexablePath].new, PrefixTree[IndexablePath])
+      @require_paths_tree = require_paths_tree
     end
 
     sig { params(indexable: IndexablePath).void }
@@ -137,7 +181,34 @@ module RubyIndexer
 
     sig { params(indexable_paths: T::Array[IndexablePath]).void }
     def index_all(indexable_paths: RubyIndexer.configuration.indexables)
-      indexable_paths.each { |path| index_single(path) }
+      cache_path = RubyIndexer.configuration.cache_path
+      FileUtils.mkdir_p(cache_path) unless Dir.exist?(cache_path)
+
+      ignore_path = File.join(cache_path, ".gitignore")
+      File.write(ignore_path, "*") unless File.exist?(ignore_path)
+
+      grouped_paths = indexable_paths.group_by(&:gem_name)
+      non_gem_paths = grouped_paths.delete(nil) || []
+
+      gem_indices = grouped_paths.map do |_gem_name, indexable_paths|
+        first_path = T.must(indexable_paths.first)
+        gem_cache = File.join(cache_path, first_path.cache_file_name)
+
+        if File.exist?(gem_cache)
+          # Load the index from the cache
+          T.cast(Marshal.load(File.read(gem_cache)), Index)
+        else
+          # Index the gem and cache it for future runs
+          index = Index.new
+          indexable_paths.each { |ip| index.index_single(ip) }
+
+          File.write(gem_cache, Marshal.dump(index))
+          index
+        end
+      end
+
+      gem_indices.each { |index| merge!(index) }
+      non_gem_paths.each { |path| index_single(path) }
     end
 
     sig { params(indexable_path: IndexablePath, source: T.nilable(String)).void }
@@ -150,6 +221,29 @@ module RubyIndexer
       @require_paths_tree.insert(require_path, indexable_path) if require_path
     rescue Errno::EISDIR
       # If `path` is a directory, just ignore it and continue indexing
+    end
+
+    # sig { params(level: T.untyped).returns(MarshalCacheType) }
+    # def _dump(level)
+    #   [@entries, @entries_tree, @files_to_entries, @require_paths_tree]
+    # end
+
+    sig { returns(MarshalCacheType) }
+    def marshal_dump
+      [@entries, @entries_tree, @files_to_entries, @require_paths_tree]
+    end
+
+    sig { params(cache: MarshalCacheType).void }
+    def marshal_load(cache)
+      @entries, @entries_tree, @files_to_entries, @require_paths_tree = cache
+    end
+
+    sig { params(other: Index).void }
+    def merge!(other)
+      @entries.merge!(other.entries)
+      @entries_tree.merge!(other.entries_tree)
+      @files_to_entries.merge!(other.files_to_entries)
+      @require_paths_tree.merge!(other.require_paths_tree)
     end
 
     class Entry

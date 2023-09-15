@@ -12,9 +12,13 @@ module RubyIndexer
         "excluded_patterns" => Array,
         "included_patterns" => Array,
         "excluded_magic_comments" => Array,
+        "cache_path" => String,
       }.freeze,
       T::Hash[String, T.untyped],
     )
+
+    sig { returns(String) }
+    attr_reader :cache_path
 
     sig { void }
     def initialize
@@ -45,6 +49,7 @@ module RubyIndexer
         ],
         T::Array[String],
       )
+      @cache_path = T.let(File.join(Dir.pwd, ".ruby-lsp", "cache"), String)
     end
 
     sig { void }
@@ -97,23 +102,38 @@ module RubyIndexer
         # If the gem name is excluded, then we skip it
         next if excluded_gems.include?(short_name)
 
+        spec = begin
+          Gem::Specification.find_by_name(short_name)
+        rescue Gem::MissingSpecError
+          # Some default files like English.rb are not actually gems
+        end
+
         # If the default gem is also a part of the bundle, we skip indexing the default one and index only the one in
         # the bundle, which won't be in `default_path`, but will be in `Bundler.bundle_path` instead
         next if locked_gems&.any? do |locked_spec|
-          locked_spec.name == short_name &&
-            !Gem::Specification.find_by_name(short_name).full_gem_path.start_with?(RbConfig::CONFIG["rubylibprefix"])
+          locked_spec.name == short_name && spec && !spec.full_gem_path.start_with?(RbConfig::CONFIG["rubylibprefix"])
         end
 
         if pathname.directory?
           # If the default_path is a directory, we index all the Ruby files in it
           indexables.concat(
             Dir.glob(File.join(default_path, "**", "*.rb"), File::FNM_PATHNAME | File::FNM_EXTGLOB).map! do |path|
-              IndexablePath.new(RbConfig::CONFIG["rubylibdir"], path, gem_name: short_name)
+              IndexablePath.new(
+                RbConfig::CONFIG["rubylibdir"],
+                path,
+                gem_name: short_name,
+                version: RUBY_VERSION,
+              )
             end,
           )
         else
           # If the default_path is a Ruby file, we index it
-          indexables << IndexablePath.new(RbConfig::CONFIG["rubylibdir"], default_path, gem_name: short_name)
+          indexables << IndexablePath.new(
+            RbConfig::CONFIG["rubylibdir"],
+            default_path,
+            gem_name: short_name,
+            version: RUBY_VERSION,
+          )
         end
       end
 
@@ -133,7 +153,7 @@ module RubyIndexer
           spec.require_paths.flat_map do |require_path|
             load_path_entry = File.join(spec.full_gem_path, require_path)
             Dir.glob(File.join(load_path_entry, "**", "*.rb")).map! do |path|
-              IndexablePath.new(load_path_entry, path, gem_name: gem_name)
+              IndexablePath.new(load_path_entry, path, gem_name: gem_name, version: lazy_spec.version.to_s)
             end
           end,
         )
@@ -176,6 +196,7 @@ module RubyIndexer
       @excluded_patterns.concat(config["excluded_patterns"]) if config["excluded_patterns"]
       @included_patterns.concat(config["included_patterns"]) if config["included_patterns"]
       @excluded_magic_comments.concat(config["excluded_magic_comments"]) if config["excluded_magic_comments"]
+      @cache_path = config["cache_path"] if config["cache_path"]
     end
   end
 end
