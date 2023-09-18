@@ -184,22 +184,45 @@ module RubyIndexer
 
     def test_indexing_constant_aliases
       index(<<~RUBY)
-        module RubyLsp
-          Interface = LanguageServer::Protocol::Interface
+        module A
+          module B
+            module C
+            end
+          end
+
+          FIRST = B::C
         end
 
-        RubyLsp::Constant = LanguageServer::Protocol::Constant
+        SECOND = A::FIRST
       RUBY
 
-      entry = @index["RubyLsp::Interface"].first
+      entries = @index["A::FIRST"]
+      entry = entries.first
       assert_instance_of(Index::Entry::UnresolvedAlias, entry)
-      assert_equal(["RubyLsp"], entry.nesting)
-      assert_equal("LanguageServer::Protocol::Interface", entry.target)
+      assert_equal(["A"], entry.nesting)
+      assert_equal("B::C", entry.target)
 
-      entry = @index["RubyLsp::Constant"].first
+      followed_alias = @index.follow_alias(entries).first
+      assert_instance_of(Index::Entry::Module, followed_alias)
+      assert_equal("A::B::C", followed_alias.name)
+
+      resolved_alias = @index["A::FIRST"].first
+      assert_instance_of(Index::Entry::Alias, resolved_alias)
+      assert_equal("A::B::C", resolved_alias.target)
+
+      entries = @index["SECOND"]
+      entry = entries.first
       assert_instance_of(Index::Entry::UnresolvedAlias, entry)
       assert_empty(entry.nesting)
-      assert_equal("LanguageServer::Protocol::Constant", entry.target)
+      assert_equal("A::FIRST", entry.target)
+
+      followed_alias = @index.follow_alias(entries).first
+      assert_instance_of(Index::Entry::Module, followed_alias)
+      assert_equal("A::B::C", followed_alias.name)
+
+      resolved_alias = @index["SECOND"].first
+      assert_instance_of(Index::Entry::Alias, resolved_alias)
+      assert_equal("A::FIRST", resolved_alias.target)
     end
   end
 end

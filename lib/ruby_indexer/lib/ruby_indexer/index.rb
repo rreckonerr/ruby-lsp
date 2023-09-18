@@ -135,6 +135,39 @@ module RubyIndexer
       nil
     end
 
+    # Resolves and follows a list of alias entries for the same name, returning the target they point to
+    sig do
+      params(
+        alias_entries: T.any(
+          T::Array[Entry::UnresolvedAlias],
+          T::Array[Entry::Alias],
+        ),
+      ).returns(T.nilable(T::Array[Entry]))
+    end
+    def follow_alias(alias_entries)
+      first_entry = T.must(alias_entries.first)
+
+      entries = T.cast(
+        if first_entry.is_a?(Entry::UnresolvedAlias)
+          resolve_alias(T.cast(alias_entries, T::Array[Entry::UnresolvedAlias]))
+        else
+          alias_entries
+        end,
+        T::Array[Entry::Alias],
+      )
+
+      entry = T.let(T.must(entries.first), Entry)
+
+      while entry.is_a?(Entry::Alias)
+        entries = T.let(@entries[entry.target], T.nilable(T::Array[Entry]))
+        return unless entries
+
+        entry = T.must(entries.first)
+      end
+
+      entries
+    end
+
     sig { params(indexable_paths: T::Array[IndexablePath]).void }
     def index_all(indexable_paths: RubyIndexer.configuration.indexables)
       indexable_paths.each { |path| index_single(path) }
@@ -150,6 +183,25 @@ module RubyIndexer
       @require_paths_tree.insert(require_path, indexable_path) if require_path
     rescue Errno::EISDIR
       # If `path` is a directory, just ignore it and continue indexing
+    end
+
+    private
+
+    # Resolves an alias updating the index with a concrete alias entry that points to the fully qualified target
+    sig { params(alias_entries: T::Array[Entry::UnresolvedAlias]).returns(T.nilable(T::Array[Entry])) }
+    def resolve_alias(alias_entries)
+      first_entry = T.cast(alias_entries.first, Entry::UnresolvedAlias)
+      target = resolve(first_entry.target, first_entry.nesting)
+      return unless target
+
+      target_name = T.must(target.first).name
+      resolved_aliases = alias_entries.map { |entry| Entry::Alias.new(target_name, entry) }
+
+      # Replace the UnresolvedAlias by a concrete one so that we don't have to do this again later
+      @entries[first_entry.name] = resolved_aliases
+      @entries_tree.insert(first_entry.name, resolved_aliases)
+
+      resolved_aliases
     end
 
     class Entry
@@ -224,6 +276,20 @@ module RubyIndexer
 
           @target = target
           @nesting = nesting
+        end
+      end
+
+      class Alias < Entry
+        extend T::Sig
+
+        sig { returns(String) }
+        attr_reader :target
+
+        sig { params(target: String, unresolved_alias: UnresolvedAlias).void }
+        def initialize(target, unresolved_alias)
+          super(unresolved_alias.name, unresolved_alias.file_path, unresolved_alias.location, unresolved_alias.comments)
+
+          @target = target
         end
       end
     end
