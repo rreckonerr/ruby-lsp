@@ -78,28 +78,33 @@ module RubyIndexer
       entries&.each { |entry| entry.visibility = :private }
     end
 
-    sig do
-      params(
-        node: T.any(YARP::ConstantWriteNode, YARP::ConstantOrWriteNode),
-      ).void
-    end
+    sig { params(node: T.any(YARP::ConstantWriteNode, YARP::ConstantOrWriteNode)).void }
     def add_constant(node)
       comments = collect_comments(node)
-      @index << Index::Entry::Constant.new(fully_qualify_name(node.name.to_s), @file_path, node.location, comments)
+      value = node.value
+      name = fully_qualify_name(node.name.to_s)
+
+      @index << if value.is_a?(YARP::ConstantReadNode) || value.is_a?(YARP::ConstantPathNode)
+        Index::Entry::UnresolvedAlias.new(value.slice, @stack.dup, name, @file_path, node.location, comments)
+      else
+        Index::Entry::Constant.new(name, @file_path, node.location, comments)
+      end
     end
 
-    sig do
-      params(
-        node: T.any(YARP::ConstantPathWriteNode, YARP::ConstantPathOrWriteNode),
-      ).void
-    end
+    sig { params(node: T.any(YARP::ConstantPathWriteNode, YARP::ConstantPathOrWriteNode)).void }
     def add_constant_with_path(node)
       # ignore variable constants like `var::FOO` or `self.class::FOO`
       return unless node.target.parent.nil? || node.target.parent.is_a?(YARP::ConstantReadNode)
 
-      name = node.target.location.slice
+      name = fully_qualify_name(node.target.location.slice)
+      value = node.value
       comments = collect_comments(node)
-      @index << Index::Entry::Constant.new(fully_qualify_name(name), @file_path, node.location, comments)
+
+      @index << if value.is_a?(YARP::ConstantReadNode) || value.is_a?(YARP::ConstantPathNode)
+        Index::Entry::UnresolvedAlias.new(value.slice, @stack.dup, name, @file_path, node.location, comments)
+      else
+        Index::Entry::Constant.new(name, @file_path, node.location, comments)
+      end
     end
 
     sig { params(node: T.any(YARP::ClassNode, YARP::ModuleNode), klass: T.class_of(Index::Entry)).void }

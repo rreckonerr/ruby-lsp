@@ -199,6 +199,33 @@ module RubyIndexer
 
       class Constant < Entry
       end
+
+      class UnresolvedAlias < Entry
+        extend T::Sig
+
+        sig { returns(String) }
+        attr_reader :target
+
+        sig { returns(T::Array[String]) }
+        attr_reader :nesting
+
+        sig do
+          params(
+            target: String,
+            nesting: T::Array[String],
+            name: String,
+            file_path: String,
+            location: YARP::Location,
+            comments: T::Array[String],
+          ).void
+        end
+        def initialize(target, nesting, name, file_path, location, comments) # rubocop:disable Metrics/ParameterLists
+          super(name, file_path, location, comments)
+
+          @target = target
+          @nesting = nesting
+        end
+      end
     end
   end
 end

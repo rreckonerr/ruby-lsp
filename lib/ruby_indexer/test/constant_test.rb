@@ -181,5 +181,25 @@ module RubyIndexer
       b_const = @index["A::B::CONST_B"].first
       assert_equal(:private, b_const.visibility)
     end
+
+    def test_indexing_constant_aliases
+      index(<<~RUBY)
+        module RubyLsp
+          Interface = LanguageServer::Protocol::Interface
+        end
+
+        RubyLsp::Constant = LanguageServer::Protocol::Constant
+      RUBY
+
+      entry = @index["RubyLsp::Interface"].first
+      assert_instance_of(Index::Entry::UnresolvedAlias, entry)
+      assert_equal(["RubyLsp"], entry.nesting)
+      assert_equal("LanguageServer::Protocol::Interface", entry.target)
+
+      entry = @index["RubyLsp::Constant"].first
+      assert_instance_of(Index::Entry::UnresolvedAlias, entry)
+      assert_empty(entry.nesting)
+      assert_equal("LanguageServer::Protocol::Constant", entry.target)
+    end
   end
 end
